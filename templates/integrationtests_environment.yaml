@@ -45,21 +45,23 @@ parameters:
     type: string
     default: 10.0.0.200
 
-  glance_image_fedora_name:
-    type: string
-    default: heat_fedora_image
-  glance_image_fedora_location:
-    type: string
-    #default: https://download.fedoraproject.org/pub/alt/atomic/stable/Fedora-Atomic-25-20161207.0/CloudImages/x86_64/images/Fedora-Atomic-25-20161207.0.x86_64.qcow2
-    default: http://ikook.tlv.redhat.com/gen_images/cloud/Fedora-Atomic-25-20161207.0.x86_64.qcow2
+# ##### currently glance is not supported on heat - as workaround 
 
-  glance_image_cirros_name:
-    type: string
-    default: heat_cirros_image
-  glance_image_cirros_location:
-    type: string
+#  glance_image_fedora_name:
+#    type: string
+#    default: heat_fedora_image
+#  glance_image_fedora_location:
+#    type: string
+    #default: https://download.fedoraproject.org/pub/alt/atomic/stable/Fedora-Atomic-25-20161207.0/CloudImages/x86_64/images/Fedora-Atomic-25-20161207.0.x86_64.qcow2
+#    default: http://ikook.tlv.redhat.com/gen_images/cloud/Fedora-Atomic-25-20161207.0.x86_64.qcow2
+
+#  glance_image_cirros_name:
+#    type: string
+#    default: heat_cirros_image
+#  glance_image_cirros_location:
+#    type: string
     #default: http://download.cirros-cloud.net/0.3.4/cirros-0.3.4-x86_64-disk.img
-    default: http://ikook.tlv.redhat.com/gen_images/cloud/cirros-0.3.4-x86_64-disk.img
+#    default: http://ikook.tlv.redhat.com/gen_images/cloud/cirros-0.3.4-x86_64-disk.img
 
   keypair_name:
     type: string
@@ -160,21 +162,21 @@ resources:
       router: {get_resource: router}
       subnet: {get_resource: private_subnet}
 
-  glance_image_fedora:
-    type: OS::Glance::Image
-    properties:
-      container_format: bare
-      disk_format: qcow2
-      location: {get_param: glance_image_fedora_location}
-      name: {get_param: glance_image_fedora_name}
+#  glance_image_fedora:
+#    type: OS::Glance::Image
+#    properties:
+#      container_format: bare
+#      disk_format: qcow2
+#      location: {get_param: glance_image_fedora_location}
+#      name: {get_param: glance_image_fedora_name}
 
-  glance_image_cirros:
-    type: OS::Glance::Image
-    properties:
-      container_format: bare
-      disk_format: qcow2
-      location: {get_param: glance_image_cirros_location}
-      name: {get_param: glance_image_cirros_name}
+#  glance_image_cirros:
+#    type: OS::Glance::Image
+#    properties:
+#      container_format: bare
+#      disk_format: qcow2
+#      location: {get_param: glance_image_cirros_location}
+#      name: {get_param: glance_image_cirros_name}
 
   keypair:
     type: OS::Nova::KeyPair
