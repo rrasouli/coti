@@ -1,83 +1,105 @@
 #!/bin/bash
+#
+# Licensed under the Apache License, Version 2.0 (the "License"); you may
+# not use this file except in compliance with the License. You may obtain
+# a copy of the License at
+#
+#      http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS, WITHOUT
+# WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied. See the
+# License for the specific language governing permissions and limitations
+# under the License.
+
+# This script creates required cloud resources and sets test options
+# in tempest.conf.
+# running the tempest as root
+
 set -e
 
-source /home/stack/overcloudrc
+yum -y install openstack-tempest
+yum -y install python-heat-tests.noarch
+source /home/stack/overcloudrc.v3
+tempest init default && cd default
+discover-tempest-config --debug identity.uri $OS_AUTH_URL identity.admin_password  $OS_PASSWORD --create
 
-echo "Gathering configuration."
-DEFAULT_DOMAIN=$(mysql -Nrse "select id from keystone.project where domain_id like '%root%';" | grep --color=never -i default)
-DEFAULT_REGION=$(mysql -Nsre "select id from keystone.region;")
-SERVICE_PROJECT=$(openstack project list -f value -c Name | grep --color=never service)
-MEMBER_ROLE=$(openstack role list -f value -c Name | grep --color=never -i member)
+DEST=/home/defualt
+
+set -x
+conf_file=$DEST/etc/tempest/tempest.conf
+cd $DEST
+curl  -o integrationtests_environment.yaml https://raw.githubusercontent.com/rrasouli/coti/master/templates/integrationtests_environment.yaml
+heat stack create -t ./integrationtests_environment.yaml test-env
+
+DEFAULT_DOMAIN=$(openstack domain list | grep $OS_USER_DOMAIN_NAME | awk '{print $2}')
+DEFAULT_REGION=$(openstack catalog list | grep -A 0  -w  heat. | awk '{print $6}')
 DEFAULT_IMAGE="heat_fedora_image"
 MINIMAL_IMAGE="heat_cirros_image"
 DEFAULT_INSTANCE="m1.small"
 MINIMAL_INSTANCE="m1.tiny"
 DEFAULT_KEYPAIR="heat_keypair"
 
-echo "Recreating the tempest folder."
-yum remove -y openstack-tempest python-tempest
-rm -rf /usr/share/openstack-tempest-13.0.0
-yum install -y openstack-tempest python-tempest
+# user creds
 
-echo "Removing resources for cleaner operation."
+crudini --set $conf_file heat_plugin username $OS_USERNAME
+crudini --set $conf_file heat_plugin password $OS_PASSWORD
+# until PR changes to project_name
+crudini --set $conf_file heat_plugin tenant_name $OS_PROJECT_NAME
+crudini --set $conf_file heat_plugin auth_url $OS_AUTH_URL
+crudini --set $conf_file heat_plugin user_domain_name $OS_USER_DOMAIN_NAME
+crudini --set $conf_file heat_plugin project_domain_name $OS_PROJECT_DOMAIN_NAME
+crudini --set $conf_file heat_plugin region $DEFAULT_REGION
+crudini --set $conf_file heat_plugin auth_version $OS_IDENTITY_API_VERSION
+crudini --set $conf_file heat_plugin admin_username $OS_USERNAME
+crudini --set $conf_file heat_plugin admin_password $OS_PASSWORD
+crudini --set $conf_file heat_plugin keypair_name $DEFAULT_KEYPAIR
 
-for stack in $(openstack stack list -f value -c "ID")
-do
-    echo "Removing stack with ID $stack"
-    openstack stack delete $stack --wait --yes
-done
 
-for resource in port subnet network
-do
-    for id in $(openstack $resource list -f value -c ID)
-    do
-        echo "Removing $resource with ID $id"
-        openstack $resource delete $id
-    done
-done
 
-echo "Creating a stack providing resources needed for tempest."
-openstack stack create --wait tempest-env -t /home/stack/templates/integrationtests_environment.yaml
 
-echo "Editing default tempest configuration."
-cd /usr/share/openstack-tempest-13.0.0
-sed -i "s|m1.nano|$MINIMAL_INSTANCE|g" tempest/config.py
-sed -i "s|m1.micro|$DEFAULT_INSTANCE|g" tempest/config.py
-sed -i "s|m1.nano|$MINIMAL_INSTANCE|g" tools/config_tempest.py
-sed -i "s|m1.micro|$DEFAULT_INSTANCE|g" tools/config_tempest.py
-sed -i "s|cirros-0.3.4-x86_64-disk.img|$MINIMAL_IMAGE|g" tools/config_tempest.py
-sed -i 's/name + "_alt"/name/g' tools/config_tempest.py
 
-echo "Installing test packages for tempest."
-tools/install_test_packages.py
+# crudini --set $conf_file heat_plugin skip_functional_test_list "AutoscalingGroupUpdatePolicyTest, AwsStackTest, CancelUpdateTest, CreateServerTest, EncryptedParametersTest, InstanceGroupUpdatePolicyTest, NotificationTest, OSWaitCondition, ParallelDeploymentsTest, PurgeTest, ReloadOnSighupTest, ReplaceDeprecatedResourceTest, ResourceGroupAdoptTest, RoleBasedExposureTest, StackTagTest, TemplateResourceAdoptTest, UpdateStackTest, ZaqarEventSinkTest, ZaqarSignalTransportTest, ZaqarWaitConditionTest"
 
-echo "Running tempest configuration."
-tools/config_tempest.py identity.uri $OS_AUTH_URL identity.admin_password $OS_PASSWORD --deployer-input /home/stack/stack-deployer-input.conf
+echo "========================================================"
 
-echo "Setting heat_plugin."
-yum install -q -y crudini mlocate
-updatedb
-crudini --set etc/tempest.conf heat_plugin auth_url $OS_AUTH_URL
-crudini --set etc/tempest.conf heat_plugin username $OS_USERNAME
-crudini --set etc/tempest.conf heat_plugin password $OS_PASSWORD
-crudini --set etc/tempest.conf heat_plugin admin_username $OS_USERNAME
-crudini --set etc/tempest.conf heat_plugin admin_password $OS_PASSWORD
-crudini --set etc/tempest.conf heat_plugin tenant_name $OS_TENANT_NAME
-crudini --set etc/tempest.conf heat_plugin region $DEFAULT_REGION
-crudini --set etc/tempest.conf heat_plugin instance_type $DEFAULT_INSTANCE
-crudini --set etc/tempest.conf heat_plugin minimal_instance_type $MINIMAL_INSTANCE
-crudini --set etc/tempest.conf heat_plugin image_ref $MINIMAL_IMAGE
-crudini --set etc/tempest.conf heat_plugin minimal_image_ref $MINIMAL_IMAGE
-crudini --set etc/tempest.conf heat_plugin keypair_name $DEFAULT_KEYPAIR
-crudini --set etc/tempest.conf heat_plugin boot_config_env $(locate test_image_env.yaml | head -n 1)
-crudini --set etc/tempest.conf heat_plugin heat_config_notify_script $(locate heat-config-notify | head -n 1)
-crudini --set etc/tempest.conf heat_plugin skip_functional_test_list "AutoscalingGroupUpdatePolicyTest, AwsStackTest, CancelUpdateTest, CreateServerTest, EncryptedParametersTest, InstanceGroupUpdatePolicyTest, NotificationTest, OSWaitCondition, ParallelDeploymentsTest, PurgeTest, ReloadOnSighupTest, ReplaceDeprecatedResourceTest, ResourceGroupAdoptTest, RoleBasedExposureTest, StackTagTest, TemplateResourceAdoptTest, UpdateStackTest, ZaqarEventSinkTest, ZaqarSignalTransportTest, ZaqarWaitConditionTest"
-crudini --set etc/tempest.conf heat_plugin skip_scenario_test_list "AodhAlarmTest, CfnInitIntegrationTest, ServerSignalIntegrationTest, SoftwareConfigIntegrationTest, VolumeBackupRestoreIntegrationTest"
+echo -e username=$OS_USERNAME
+echo -e password=$OS_PASSWORD
+echo -e tenant_name=$OS_PROJECT_NAME
+echo -e auth_url=$OS_AUTH_URL
+echo -e user_domain_name=$OS_USER_DOMAIN_NAME
+echo -e project_domain_name=$OS_PROJECT_DOMAIN_NAME
+echo -e region=$DEFAULT_REGION
+echo -e auth_version=$OS_IDENTITY_API_VERSION
 
-set +e
-echo "Running tempest"
-tools/run-tests.sh heat_integrationtests
+echo "========================================================"
 
-RES_FILE="$(hostname | cut -d "." -f 1)_heat_integrationtests.xml"
 
-mv tempest.xml /root/$RES_FILE
+
+# Register the glance image for testing
+curl http://ikook.tlv.redhat.com/gen_images/cloud/Fedora-Atomic-25-20161207.0.x86_64.qcow2 | openstack image create heat_fedora_image --disk-format qcow2 --container-format bare --public
+curl http://ikook.tlv.redhat.com/gen_images/cloud/cirros-0.3.4-x86_64-disk.img | openstack image create heat_cirros_image --disk-format qcow2 --container-format bare --public
+# modify default image and flavors
+crudini --set $conf_file heat_plugin minimal_image_ref $MINIMAL_IMAGE
+crudini --set $conf_file heat_plugin image_ref $DEFAULT_IMAGE
+crudini --set $conf_file heat_plugin minimal_instance_type $MINIMAL_INSTANCE
+crudini --set $conf_file heat_plugin instance_type $DEFAULT_INSTANCE
+
+
+
+# Skip test_cancel_update_server_with_port till bug #1607714 is fixed in nova
+crudini --set $conf_file heat_plugin skip_functional_test_list 'CancelUpdateTest.test_cancel_update_server_with_port, StackSnapshotRestoreTest'
+
+# Add scenario tests to skip
+# VolumeBackupRestoreIntegrationTest skipped until failure rate can be reduced ref bug #1382300
+# test_server_signal_userdata_format_software_config is skipped untill bug #1651768 is resolved
+# StackSnapshotRestoreTest skipped until bug #1694371 is resolved
+crudini --set $conf_file heat_plugin skip_scenario_test_list 'SoftwareConfigIntegrationTest, VolumeBackupRestoreIntegrationTest'
+# skipping failing setup tests 
+# TODO which tests should be off list
+crudini --set etc/tempest.conf heat_plugin skip_functional_test_list "AutoscalingGroupUpdatePolicyTest, AwsStackTest, CancelUpdateTest, CreateServerTest, \
+EncryptedParametersTest, InstanceGroupUpdatePolicyTest, NotificationTest, OSWaitCondition, ParallelDeploymentsTest, PurgeTest, ReloadOnSighupTest, ReplaceDeprecatedResourceTest, \
+ResourceGroupAdoptTest, RoleBasedExposureTest, StackTagTest, TemplateResourceAdoptTest, UpdateStackTest, ZaqarEventSinkTest, ZaqarSignalTransportTest, ZaqarWaitConditionTest"
+crudini --set etc/tempest.conf heat_plugin skip_scenario_test_list "AodhAlarmTest, CfnInitIntegrationTest, ServerSignalIntegrationTest"
+
+cat $conf_file
