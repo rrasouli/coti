@@ -21,7 +21,6 @@ set -e
 yum -y install openstack-tempest
 yum -y install python-heat-tests.noarch
 source /home/stack/overcloudrc.v3
-cd
 tempest init default && cd default
 discover-tempest-config --debug identity.uri $OS_AUTH_URL identity.password $OS_PASWORD \
 identity.username $OS_USERNAME identity.admin_username $OS_USERNAME  identity.tenant_name $OS_PROJECT_NAME --create
@@ -32,7 +31,7 @@ set -x
 conf_file=$DEST/etc/tempest/tempest.conf
 cd $DEST
 curl  -o integrationtests_environment.yaml https://raw.githubusercontent.com/rrasouli/coti/master/templates/integrationtests_environment.yaml
-heat stack create -t ./integrationtests_environment.yaml test-env
+openstack stack create -t ./integrationtests_environment.yaml test-env
 DEFAULT_DOMAIN=$(openstack domain list | grep $OS_USER_DOMAIN_NAME | awk '{print $2}')
 DEFAULT_REGION=$(openstack catalog list | grep -A 0  -w  heat. | awk '{print $6}')
 DEFAULT_IMAGE="heat_fedora_image"
