@@ -18,6 +18,10 @@
 
 set -e
 
+# ## remove any previous templates
+
+for stack in $(openstack stack list | grep -iv ID | awk '{print $2}'); do openstack stack delete $stack; done
+
 sudo yum -y install openstack-tempest
 sudo yum -y install python-heat-tests.noarch
 source /home/stack/overcloudrc.v3
@@ -104,5 +108,6 @@ ResourceGroupAdoptTest, RoleBasedExposureTest, StackTagTest, TemplateResourceAdo
 crudini --set etc/tempest.conf heat_plugin skip_scenario_test_list "AodhAlarmTest, CfnInitIntegrationTest, ServerSignalIntegrationTest"
 
 cat $conf_file
-~                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                          
-~                                                                                                                                                         
+
+tempest run --regex heat_integrationtests                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                         
+                                                                                                                                                      
