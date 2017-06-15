@@ -18,8 +18,8 @@
 
 set -e
 
-yum -y install openstack-tempest
-yum -y install python-heat-tests.noarch
+sudo yum -y install openstack-tempest
+sudo yum -y install python-heat-tests.noarch
 source /home/stack/overcloudrc.v3
 tempest init default && cd default
 discover-tempest-config --debug identity.uri $OS_AUTH_URL identity.password $OS_PASWORD \
