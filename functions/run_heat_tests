@@ -21,10 +21,9 @@ set -e
 sudo yum -y install openstack-tempest
 sudo yum -y install python-heat-tests.noarch
 source /home/stack/overcloudrc.v3
+NET_ID=$(openstack network list | grep public | awk '{print $2}')
 tempest init default && cd default
-discover-tempest-config --debug identity.uri $OS_AUTH_URL identity.password $OS_PASWORD \
-identity.username $OS_USERNAME identity.admin_username $OS_USERNAME  identity.tenant_name $OS_PROJECT_NAME --create
-
+discover-tempest-config  --debug --create identity.uri $OS_AUTH_URL  identity.admin_password $OS_PASSWORD --network-id $NET_ID
 DEST=/home/stack/default
 
 set -x
