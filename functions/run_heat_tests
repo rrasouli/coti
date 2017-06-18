@@ -24,7 +24,8 @@ source /home/stack/overcloudrc.v3
 
 for stack in $(openstack stack list | grep -iv ID | awk '{print $2}'); do openstack stack delete -y $stack; done
 for i in $(openstack image list | grep -v ID| awk '{print $2}'); do openstack image delete $i ; done
-rm -rf default .tempest /tmp/tempest-lock
+rm -rf default /tmp/tempest-lock
+rm -f .tempest
 
 # install tempeset
 sudo yum -y install openstack-tempest
